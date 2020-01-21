@@ -15,7 +15,7 @@ import sys
 import threading
 import time
 from queue import Queue, Empty
-from typing import Any
+from typing import Any, Optional, Dict, MutableMapping
 
 import pendulum
 
@@ -159,6 +159,32 @@ def configure_logging(testing: bool = False) -> logging.Logger:
 prefect_logger = configure_logging()
 
 
+_original_log_record_factory = logging.getLogRecordFactory()
+
+
+def _log_record_parameter_injector(
+    name: str,
+    level: int,
+    fn: str,
+    lno: int,
+    msg: str,
+    args: Any,
+    exc_info: Any,
+    func: Any = None,
+    sinfo: Any = None,
+    **kwargs: Any
+) -> logging.LogRecord:
+    record = _original_log_record_factory(
+        name, level, fn, lno, msg, args, exc_info, func=None, sinfo=None
+    )
+    for kw, value in kwargs.items():
+        setattr(record, kw, value)
+    return record
+
+
+logging.setLogRecordFactory(_log_record_parameter_injector)
+
+
 def get_logger(name: str = None) -> logging.Logger:
     """
     Returns a "prefect" logger.
@@ -171,7 +197,44 @@ def get_logger(name: str = None) -> logging.Logger:
     Returns:
         - logging.Logger: a configured logging object with the appropriate name
     """
+
     if name is None:
         return prefect_logger
     else:
         return prefect_logger.getChild(name)
+
+
+class ContextLogAdapter(logging.LoggerAdapter):
+    def __init__(
+        self, logger: "logging.Logger", extra: Optional[MutableMapping[str, Any]] = None
+    ) -> None:
+        super().__init__(logger, extra or {})
+
+    def log(self, level: int, msg: str, *args: Any, **kwargs: Any) -> None:
+        if self.isEnabledFor(level):
+            msg, new_kwargs = self.process(msg, kwargs)  # mypy: ignore
+            extra = dict(self.extra)
+            extra.update(new_kwargs.pop("extra", {}))
+            self.logger.log(level, msg, *args, extra=extra, **new_kwargs)
+
+
+class FlowLogAdapter(ContextLogAdapter):
+    def __init__(self, logger: "logging.Logger", flow: "prefect.Flow") -> None:
+        super().__init__(
+            logger,
+            extra={
+                "flow_name": getattr(flow, "name", None),
+                "flow_slug": getattr(flow, "slug", None),
+            },
+        )
+
+
+class TaskLogAdapter(ContextLogAdapter):
+    def __init__(self, logger: "logging.Logger", task: "prefect.Task") -> None:
+        super().__init__(
+            logger,
+            extra={
+                "task_name": getattr(task, "name", None),
+                "task_slug": getattr(task, "slug", None),
+            },
+        )

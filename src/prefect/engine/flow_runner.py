@@ -33,6 +33,7 @@ from prefect.engine.state import (
 from prefect.engine.task_runner import TaskRunner
 from prefect.utilities.collections import flatten_seq
 from prefect.utilities.executors import run_with_heartbeat
+from prefect.utilities import logging
 
 FlowRunnerInitializeResult = NamedTuple(
     "FlowRunnerInitializeResult",
@@ -96,6 +97,7 @@ class FlowRunner(Runner):
             task_runner_cls = prefect.engine.get_default_task_runner_class()
         self.task_runner_cls = task_runner_cls
         super().__init__(state_handlers=state_handlers)
+        self.logger = logging.FlowLogAdapter(self.logger, flow=flow)
 
     def __repr__(self) -> str:
         return "<{}: {}>".format(type(self).__name__, self.flow.name)

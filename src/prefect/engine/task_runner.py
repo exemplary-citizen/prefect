@@ -51,6 +51,7 @@ from prefect.utilities.executors import (
     tail_recursive,
     RecursiveCall,
 )
+from prefect.utilities import logging
 
 if TYPE_CHECKING:
     from prefect.engine.result_handlers import ResultHandler
@@ -93,6 +94,7 @@ class TaskRunner(Runner):
         self.task = task
         self.result_handler = task.result_handler or result_handler
         super().__init__(state_handlers=state_handlers)
+        self.logger = logging.TaskLogAdapter(self.logger, task=task)
 
     def __repr__(self) -> str:
         return "<{}: {}>".format(type(self).__name__, self.task.name)

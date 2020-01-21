@@ -1,6 +1,9 @@
 import collections
 import functools
-from typing import Any, Callable, Dict, Iterable, Optional, Tuple
+from typing import Any, Callable, Dict, Iterable, Optional, Tuple, Union, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    import logging as py_logging
 
 import prefect
 from prefect.engine import signals
@@ -87,7 +90,9 @@ class Runner:
         ):
             raise TypeError("state_handlers should be iterable.")
         self.state_handlers = state_handlers or []
-        self.logger = logging.get_logger(type(self).__name__)
+        self.logger = logging.get_logger(
+            type(self).__name__
+        )  # type: Union[py_logging.Logger, py_logging.LoggerAdapter]
 
     def __repr__(self) -> str:
         return '<"Runner">'

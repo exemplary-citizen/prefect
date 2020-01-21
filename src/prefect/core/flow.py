@@ -109,6 +109,8 @@ class Flow:
 
     Args:
         - name (str): The name of the flow. Cannot be `None` or an empty string
+        - slug (str, optional): The slug for this flow. Slugs are required and should be 
+            unique across flows; if not provided a random UUID will be generated.
         - schedule (prefect.schedules.Schedule, optional): A default schedule for the flow
         - environment (prefect.environments.Environment, optional): The environment
            that the flow should be run in. If `None`, a `RemoteEnvironment` will be created.
@@ -141,6 +143,7 @@ class Flow:
     def __init__(
         self,
         name: str,
+        slug: str = None,
         schedule: prefect.schedules.Schedule = None,
         environment: Environment = None,
         storage: Storage = None,
@@ -158,7 +161,12 @@ class Flow:
             raise ValueError("A name must be provided for the flow.")
 
         self.name = name
-        self.logger = logging.get_logger("Flow: {}".format(self.name))
+        self.slug = slug or str(uuid.uuid4())
+
+        self.logger = logging.FlowLogAdapter(
+            logging.get_logger("Flow: {}".format(self.name)), flow=self
+        )
+
         self.schedule = schedule
         self.environment = environment or prefect.environments.RemoteEnvironment()
         self.storage = storage
